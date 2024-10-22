@@ -2,7 +2,7 @@ _target_: datasets.smnist.SMNISTLDM
 data_path: ${datadir}
 input_size: 99
 dt: 1000
-batch_size: 128
+batch_size: 32
 num_workers: 1
 num_classes: 10
 valid_fraction: 0.05

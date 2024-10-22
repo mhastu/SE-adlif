@@ -10,11 +10,20 @@ from datasets.utils.pad_tensors import PadTensors
 class SMNISTWrapper(SMNIST):
     """Wrapper to support block_idx (only needed for compatibility with models,
     even though MNIST does not need padding)"""
-    dataset_name = "SHD"
+    dataset_name = "SMNIST"
     def __getitem__(self, index):
         events, target = super().__getitem__(index)
         block_idx = torch.ones((events.shape[0],), dtype=torch.int64)
         return events, target, block_idx
+
+def collate(batch):        
+    inputs, target_list, block_idx = list(zip(*batch))  # type: ignore
+
+    # If target is a scalar, convert it to a tensor
+    if len(target_list[0].shape) == 0:
+        target_list = torch.tensor(target_list).unsqueeze(1)
+
+    return inputs, target_list, block_idx
 
 class SMNISTLDM(pl.LightningDataModule):
     def __init__(
@@ -37,7 +46,8 @@ class SMNISTLDM(pl.LightningDataModule):
         self.valid_fraction = valid_fraction
         self.random_seed = random_seed
 
-        self.collate_fn = PadTensors()
+        #self.collate_fn = PadTensors()
+        self.collate_fn = collate
         self.input_size = input_size
         self.output_size = num_classes
 
