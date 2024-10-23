@@ -1,9 +1,10 @@
 _target_: datasets.smnist.SMNISTLDM
 data_path: ${datadir}
-input_size: 99
+num_neurons: 99
 dt: 1000
 batch_size: 32
-num_workers: 1
+num_workers: 8
 num_classes: 10
 valid_fraction: 0.05
 random_seed: 42
+window_size: 1000

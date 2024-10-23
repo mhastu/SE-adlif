@@ -5,6 +5,9 @@ import math
 from typing import Optional
 from torch.utils.data import DataLoader
 from datasets.utils.pad_tensors import PadTensors
+from tonic.transforms import ToFrame, Compose
+from datasets.utils.transforms import Flatten
+import numpy as np
 
 
 class SMNISTWrapper(SMNIST):
@@ -13,23 +16,16 @@ class SMNISTWrapper(SMNIST):
     dataset_name = "SMNIST"
     def __getitem__(self, index):
         events, target = super().__getitem__(index)
+        target = target.astype(np.int64)  # fix in pad_sequence "RuntimeError: value cannot be converted to type uint8_t without overflow"
         block_idx = torch.ones((events.shape[0],), dtype=torch.int64)
         return events, target, block_idx
-
-def collate(batch):        
-    inputs, target_list, block_idx = list(zip(*batch))  # type: ignore
-
-    # If target is a scalar, convert it to a tensor
-    if len(target_list[0].shape) == 0:
-        target_list = torch.tensor(target_list).unsqueeze(1)
-
-    return inputs, target_list, block_idx
 
 class SMNISTLDM(pl.LightningDataModule):
     def __init__(
         self,
         data_path: str,
-        input_size: int = 99,  # number of input neurons, must be odd
+        window_size: float = 1000.0,  # should also be in us, since dt is in us
+        num_neurons: int = 99,  # number of input neurons, must be odd
         dt: float = 1000,  # duration (in us) for each timestep
         batch_size: int = 32,
         num_workers: int = 1,
@@ -40,31 +36,46 @@ class SMNISTLDM(pl.LightningDataModule):
     ) -> None:
         super().__init__()
         self.data_path = data_path
+        self.window_size = window_size
         self.dt = dt
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_fraction = valid_fraction
         self.random_seed = random_seed
 
-        #self.collate_fn = PadTensors()
-        self.collate_fn = collate
-        self.input_size = input_size
+        # TODO: try without PadTensors() (then a default collate_fn is used)
+        self.collate_fn = PadTensors()
         self.output_size = num_classes
+
+        sensor_size = (num_neurons, 1, 1)
+        self.input_size = math.prod(sensor_size)
+        _event_to_tensor = ToFrame(
+            sensor_size=sensor_size, time_window=self.window_size
+        )
+        def event_to_tensor(x):
+            return torch.from_numpy(_event_to_tensor(x)).float()
+
+        self.static_data_transform = Compose([
+            event_to_tensor,
+            Flatten()
+        ])
 
         self.generator = torch.Generator().manual_seed(self.random_seed)
 
         self.data_test = SMNISTWrapper(
             save_to=self.data_path,
             train=False,
-            num_neurons=self.input_size,
-            dt=self.dt
+            num_neurons=num_neurons,
+            dt=self.dt,
+            transform=self.static_data_transform
         )
 
         self.train_val_ds = SMNISTWrapper(
             save_to=self.data_path,
             train=True,
             num_neurons=self.input_size,
-            dt=self.dt
+            dt=self.dt,
+            transform=self.static_data_transform
         )
         valid_len = math.floor(len(self.train_val_ds) * self.valid_fraction)
         self.data_train, self.data_val = torch.utils.data.random_split(
