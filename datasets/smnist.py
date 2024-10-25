@@ -11,8 +11,7 @@ import numpy as np
 
 
 class SMNISTWrapper(SMNIST):
-    """Wrapper to support block_idx (only needed for compatibility with models,
-    even though MNIST does not need padding)"""
+    """Wrapper to support block_idx"""
     dataset_name = "SMNIST"
     def __getitem__(self, index):
         events, target = super().__getitem__(index)
@@ -25,7 +24,7 @@ class SMNISTLDM(pl.LightningDataModule):
         self,
         data_path: str,
         window_size: float = 1000.0,  # should also be in us, since dt is in us
-        num_neurons: int = 99,  # number of input neurons, must be odd
+        input_size: int = 33,  # number of input neurons, must be odd
         dt: float = 1000,  # duration (in us) for each timestep
         batch_size: int = 32,
         num_workers: int = 1,
@@ -47,8 +46,8 @@ class SMNISTLDM(pl.LightningDataModule):
         self.collate_fn = PadTensors()
         self.output_size = num_classes
 
-        sensor_size = (num_neurons, 1, 1)
-        self.input_size = math.prod(sensor_size)
+        self.input_size = input_size
+        sensor_size = (input_size, 1, 1)
         _event_to_tensor = ToFrame(
             sensor_size=sensor_size, time_window=self.window_size
         )

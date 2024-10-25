@@ -9,7 +9,7 @@ exp_name: SMNIST_SE_adLIF
 cell: se_adlif
 
 # number of neurons
-n_neurons: 360
+n_neurons: 720
 
 # Whether to use a two-layer network
 two_layers: true
@@ -22,7 +22,7 @@ alpha: 5
 c: 0.4
 
 # Number of epochs
-n_epochs: 300
+n_epochs: 40
 
 # Range of tau_u
 tau_u_range: [5, 25]
@@ -37,7 +37,7 @@ dropout: 0.15
 tau_out_range: [15, 15]
 
 # Batch size
-batch_size: 128
+batch_size: 256
 
 # Loss aggregation
 loss_agg: softmax
@@ -53,4 +53,4 @@ factor: 0.9
 patience: 9999
 
 # number of input neurons (must be odd)
-input_size: 99
+input_size: 33
