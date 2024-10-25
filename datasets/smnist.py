@@ -64,7 +64,7 @@ class SMNISTLDM(pl.LightningDataModule):
         self.data_test = SMNISTWrapper(
             save_to=self.data_path,
             train=False,
-            num_neurons=num_neurons,
+            num_neurons=self.input_size,
             dt=self.dt,
             transform=self.static_data_transform
         )
