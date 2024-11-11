@@ -9,20 +9,20 @@ exp_name: SMNIST_SE_adLIF
 cell: se_adlif
 
 # number of neurons
-n_neurons: 720
+n_neurons: 180
 
 # Whether to use a two-layer network
 two_layers: true
 
 # Factor for reparametrization of a and b (see paper)
-q: 120
+q: 60
 
 # Parameters of SLAYER
 alpha: 5
-c: 0.4
+c: 0.2
 
 # Number of epochs
-n_epochs: 40
+n_epochs: 20
 
 # Range of tau_u
 tau_u_range: [5, 25]
@@ -31,7 +31,7 @@ tau_u_range: [5, 25]
 tau_w_range: [60, 300]
 
 # Dropout rate
-dropout: 0.15
+dropout: 0
 
 # Time constant of output layer 
 tau_out_range: [15, 15]
@@ -45,7 +45,7 @@ tracking_mode: max
 
 # optimizer parameters
 # learning rate of the optimizer
-lr: 0.01
+lr: 0.006
 factor: 0.9
 patience: 9999
 

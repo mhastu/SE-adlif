@@ -13,10 +13,26 @@ import numpy as np
 class SMNISTWrapper(SMNIST):
     """Wrapper to support block_idx"""
     dataset_name = "SMNIST"
+
+    def __init__(
+        self,
+        save_to,
+        train=True,
+        duplicate=True,
+        num_neurons=33,
+        dt=1000.0,
+        transform=None,
+        target_transform=None,
+        ignore_first_timesteps: int = 20,
+    ):
+        super().__init__(save_to, train=train, duplicate=duplicate, num_neurons=num_neurons, dt=dt, transform=transform, target_transform=target_transform)
+        self.ignore_first_timesteps = ignore_first_timesteps
+
     def __getitem__(self, index):
         events, target = super().__getitem__(index)
         target = target.astype(np.int64)  # fix in pad_sequence "RuntimeError: value cannot be converted to type uint8_t without overflow"
         block_idx = torch.ones((events.shape[0],), dtype=torch.int64)
+        block_idx[:self.ignore_first_timesteps] = 0
         return events, target, block_idx
 
 class SMNISTLDM(pl.LightningDataModule):
@@ -31,7 +47,8 @@ class SMNISTLDM(pl.LightningDataModule):
         name: str = None,  # for hydra
         num_classes: int = 10,  # for hydra
         valid_fraction: float = 0.05,
-        random_seed = 42
+        random_seed = 42,
+        ignore_first_timesteps: int = 10
     ) -> None:
         super().__init__()
         self.data_path = data_path
@@ -41,6 +58,7 @@ class SMNISTLDM(pl.LightningDataModule):
         self.num_workers = num_workers
         self.valid_fraction = valid_fraction
         self.random_seed = random_seed
+        self.ignore_first_timesteps = ignore_first_timesteps
 
         # TODO: try without PadTensors() (then a default collate_fn is used)
         self.collate_fn = PadTensors()
@@ -66,7 +84,8 @@ class SMNISTLDM(pl.LightningDataModule):
             train=False,
             num_neurons=self.input_size,
             dt=self.dt,
-            transform=self.static_data_transform
+            transform=self.static_data_transform,
+            ignore_first_timesteps=self.ignore_first_timesteps
         )
 
         self.train_val_ds = SMNISTWrapper(
@@ -74,7 +93,8 @@ class SMNISTLDM(pl.LightningDataModule):
             train=True,
             num_neurons=self.input_size,
             dt=self.dt,
-            transform=self.static_data_transform
+            transform=self.static_data_transform,
+            ignore_first_timesteps=self.ignore_first_timesteps
         )
         valid_len = math.floor(len(self.train_val_ds) * self.valid_fraction)
         self.data_train, self.data_val = torch.utils.data.random_split(
