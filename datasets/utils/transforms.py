@@ -5,6 +5,7 @@ import torch
 
 @dataclass(frozen=True)
 class Flatten:
+    """Reshapes input tensor t to (t.shape[0], x) where x is inferred from original size"""
     def __call__(self, data: np.ndarray):
         return data.reshape(data.shape[0], -1)
 
