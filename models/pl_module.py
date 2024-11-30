@@ -42,6 +42,8 @@ class MLPSNN(pl.LightningModule):
         self.output_size = cfg.dataset.num_classes
         self.batch_size = cfg.dataset.batch_size
 
+        cfg.input_layer_size = cfg.input_size  # keep input size in hparams.yaml (we overwrite cfg.input_size in the following lines)
+
         # Define the model
         self.cell = layer_map[cfg.cell]
         self.l1 = self.cell(cfg)
