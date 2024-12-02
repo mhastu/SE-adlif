@@ -112,8 +112,10 @@ with torch.no_grad():
 input = inputs[i_in_batch]
 outseq = outseqs[i_in_batch]
 l1seq = l1seqs[i_in_batch]
+l1seq = torch.where(l1seq != 0, torch.tensor(1, dtype=l1seq.dtype), torch.tensor(0, dtype=l1seq.dtype))  # map all non-zero values to 1
 if l2seqs is not None:
     l2seq = l2seqs[i_in_batch]
+    l2seq = torch.where(l2seq != 0, torch.tensor(1, dtype=l2seq.dtype), torch.tensor(0, dtype=l2seq.dtype))  # map all non-zero values to 1
 
 num_subplots = 3 if l2seqs is None else 4
 i_subplot = 0
@@ -123,20 +125,20 @@ maxaxheight = 6
 minaxheight = 0.1
 
 axheights = []
-inputaxheight = input.shape[1]/20/xlim[1]*1000
+inputaxheight = input.shape[1]/100/xlim[1]*1000
 if inputaxheight < minaxheight:
     inputaxheight = minaxheight
 if inputaxheight > maxaxheight:
     inputaxheight = maxaxheight
 axheights.append(inputaxheight)
-l1axheight = l1seq.shape[1]/35/xlim[1]*1000
+l1axheight = l1seq.shape[1]/70/xlim[1]*1000
 if l1axheight < minaxheight:
     l1axheight = minaxheight
 if l1axheight > maxaxheight:
     l1axheight = maxaxheight
 axheights.append(l1axheight)
 if l2seqs is not None:
-    l2axheight = l2seq.shape[1]/35/xlim[1]*1000
+    l2axheight = l2seq.shape[1]/70/xlim[1]*1000
     if l2axheight < minaxheight:
         l2axheight = minaxheight
     if l2axheight > maxaxheight:
@@ -163,13 +165,8 @@ i_subplot += 1
 
 # event plot for the spike train
 axs[i_subplot].set_ylabel("Layer 1")
-# Convert the spike train into an event list format
-neuron_indices, time_steps = np.where(l1seq.T == 1)  # Find where spikes occur
-events = [[] for _ in range(l1seq.shape[1])]  # Create a list for each neuron
-for neuron, t in zip(neuron_indices, time_steps):
-    events[neuron].append(t)
 axs[i_subplot].set_xlim(xlim)
-axs[i_subplot].eventplot(events, orientation="horizontal", linelengths=0.8, colors="black")
+axs[i_subplot].imshow(l1seq.T, aspect="auto", cmap="Greys", origin="lower", interpolation="nearest")
 divider = make_axes_locatable(axs[i_subplot])
 cax = divider.append_axes('right', size='5%', pad=0.05)
 cax.set_visible(False)
@@ -178,13 +175,8 @@ i_subplot += 1
 if l2seqs is not None:
     # event plot for the spike train
     axs[i_subplot].set_ylabel("Layer 2")
-    # Convert the spike train into an event list format
-    neuron_indices, time_steps = np.where(l2seq.T == 1)  # Find where spikes occur
-    events = [[] for _ in range(l2seq.shape[1])]  # Create a list for each neuron
-    for neuron, t in zip(neuron_indices, time_steps):
-        events[neuron].append(t)
     axs[i_subplot].set_xlim(xlim)
-    axs[i_subplot].eventplot(events, orientation="horizontal", linelengths=0.8, colors="black")
+    axs[i_subplot].imshow(l2seq.T, aspect="auto", cmap="Greys", origin="lower", interpolation="nearest")
     divider = make_axes_locatable(axs[i_subplot])
     cax = divider.append_axes('right', size='5%', pad=0.05)
     cax.set_visible(False)
