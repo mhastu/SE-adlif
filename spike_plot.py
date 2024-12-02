@@ -1,19 +1,45 @@
 import torch
 import os
 import hydra
-from models.pl_module import MLPSNN  # Import your SNN model
+from models.pl_module import MLPSNN
 from omegaconf import OmegaConf
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+import argparse
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-# TODO: argparse --------------------
-ckpt_path = "results/hydra/2024-11-30/13-23-55/ckpt/epoch=19-step=2220.ckpt"
-device = "cpu"  # type: str | None
-i_in_batch = 0
-# -----------------------------------
+parser = argparse.ArgumentParser(description="Plot spiking events or current values of all layers (input, 1, 2, output) when passing one sample through the model, given a checkpoint file. Model configuration is taken from parent directory of checkpoint path (hparams.yaml)")
 
-cwd = os.path.dirname(os.path.dirname(ckpt_path))
+parser.add_argument(
+    "-f", "--ckpt-filepath", 
+    type=str,
+    required=True,
+    help="Path to the checkpoint file."
+)
+parser.add_argument(
+    "-d", "--device", 
+    type=str, 
+    default="cpu", 
+    help="Device to use (e.g., 'cpu' or 'cuda:0'), default: 'cpu'."
+)
+parser.add_argument(
+    "-i", "--i-in-batch", 
+    type=int, 
+    default=0, 
+    help="Sample index in batch."
+)
+
+args = parser.parse_args()
+
+ckpt_filepath = args.ckpt_filepath
+device = args.device
+i_in_batch = args.i_in_batch
+
+cwd = os.path.dirname(os.path.dirname(ckpt_filepath))
+
+time = os.path.basename(cwd)
+date = os.path.basename(os.path.dirname(cwd))
 
 class MLPSNN_spiketrain(MLPSNN):
     def forward(
@@ -47,19 +73,19 @@ class MLPSNN_spiketrain(MLPSNN):
         l2_sequence_ = torch.stack(l2_sequence, dim=1) if self.two_layers else None
         return torch.stack(out_sequence, dim=1), torch.stack(l1_sequence, dim=1), l2_sequence_
 
-# Load configuration
+# Load hyperparameter configuration
 cfg_path = os.path.join(cwd, "logs/mlp_snn/version_0/hparams.yaml")
 cfg = OmegaConf.load(cfg_path).cfg
 
-cfg.input_size = cfg.input_layer_size  # restore messed-up input_size (see pl_module.py)
+cfg.input_size = cfg.dataset.input_size  # restore messed-up input_size (see pl_module.py)
 
 # Load dataset
 datamodule = hydra.utils.instantiate(cfg.dataset)
-datamodule.setup("test")  # Ensure the dataloader is prepared
+datamodule.setup("test")
 
 # Load the model
 model = MLPSNN_spiketrain.load_from_checkpoint(
-    checkpoint_path=ckpt_path,
+    checkpoint_path=ckpt_filepath,
     cfg=cfg
 )
 
@@ -69,7 +95,8 @@ model.eval()
 # Load a random sample from the dataset
 test_loader = datamodule.test_dataloader()
 data_iter = iter(test_loader)
-inputs, targets, _ = next(data_iter)  # Assuming the dataset provides inputs, targets, and block_idx
+inputs, targets, _ = next(data_iter)
+print(inputs.shape)
 
 # Move inputs to the configured device
 if device is None:
@@ -78,66 +105,104 @@ inputs = inputs.to(device)
 
 # Forward pass to compute the spike train
 with torch.no_grad():
-    outseq, l1seq, l2seq = model(inputs)
+    outseqs, l1seqs, l2seqs = model(inputs)
 
 
 # ------------- PLOTS ----------------
-inputs = inputs[i_in_batch]
-outseq = outseq[i_in_batch]
-l1seq = l1seq[i_in_batch]
-if l2seq is not None:
-    l2seq = l2seq[i_in_batch]
+input = inputs[i_in_batch]
+outseq = outseqs[i_in_batch]
+l1seq = l1seqs[i_in_batch]
+if l2seqs is not None:
+    l2seq = l2seqs[i_in_batch]
 
-plt.figure(figsize=(6,6))
-plt.imshow(inputs.view(28, 28), aspect="auto", cmap="viridis", interpolation="nearest")
-plt.savefig("input.png")
-plt.close()
+num_subplots = 3 if l2seqs is None else 4
+i_subplot = 0
 
-num_subplots = 3 if l2seq is None else 4
-i_subplot = 1
+xlim = [0, input.shape[0]]
+maxaxheight = 6
+minaxheight = 0.1
 
-xlim = [0, inputs.shape[0]]
+axheights = []
+inputaxheight = input.shape[1]/20/xlim[1]*1000
+if inputaxheight < minaxheight:
+    inputaxheight = minaxheight
+if inputaxheight > maxaxheight:
+    inputaxheight = maxaxheight
+axheights.append(inputaxheight)
+l1axheight = l1seq.shape[1]/35/xlim[1]*1000
+if l1axheight < minaxheight:
+    l1axheight = minaxheight
+if l1axheight > maxaxheight:
+    l1axheight = maxaxheight
+axheights.append(l1axheight)
+if l2seqs is not None:
+    l2axheight = l2seq.shape[1]/35/xlim[1]*1000
+    if l2axheight < minaxheight:
+        l2axheight = minaxheight
+    if l2axheight > maxaxheight:
+        l2axheight = maxaxheight
+    axheights.append(l2axheight)
+outputaxheight = outseq.shape[1]/20/xlim[1]*1000
+if outputaxheight < minaxheight:
+    outputaxheight = minaxheight
+if outputaxheight > maxaxheight:
+    outputaxheight = maxaxheight
+axheights.append(outputaxheight)
 
 # heatmap for the input values
-plt.figure(figsize=(12, 6))
-plt.subplot(num_subplots, 1, i_subplot)
-plt.ylabel("Input")
-plt.imshow(inputs.T, aspect="auto", cmap="viridis", origin="lower", interpolation="nearest")
+fig, axs = plt.subplots(num_subplots,1,figsize=(12,sum(axheights)), gridspec_kw={'height_ratios': axheights})
+
+if input.shape[1] == 1:
+    axs[i_subplot].get_yaxis().set_ticks([])  # no tick labels for only 1 input neuron
+axs[i_subplot].set_ylabel("Input")
+im = axs[i_subplot].imshow(input.T, aspect="auto", cmap="viridis", origin="lower", interpolation="nearest")
+divider = make_axes_locatable(axs[i_subplot])
+cax = divider.append_axes('right', size='5%', pad=0.05)
+fig.colorbar(im, cax=cax, orientation='horizontal' if input.shape[1] == 1 else 'vertical')
 i_subplot += 1
 
 # event plot for the spike train
-plt.subplot(num_subplots, 1, i_subplot)
-plt.ylabel("Layer 1")
+axs[i_subplot].set_ylabel("Layer 1")
 # Convert the spike train into an event list format
 neuron_indices, time_steps = np.where(l1seq.T == 1)  # Find where spikes occur
 events = [[] for _ in range(l1seq.shape[1])]  # Create a list for each neuron
-for neuron, time in zip(neuron_indices, time_steps):
-    events[neuron].append(time)
-plt.xlim(xlim)
-plt.eventplot(events, orientation="horizontal", linelengths=0.8, colors="black")
-plt.tight_layout()
+for neuron, t in zip(neuron_indices, time_steps):
+    events[neuron].append(t)
+axs[i_subplot].set_xlim(xlim)
+axs[i_subplot].eventplot(events, orientation="horizontal", linelengths=0.8, colors="black")
+divider = make_axes_locatable(axs[i_subplot])
+cax = divider.append_axes('right', size='5%', pad=0.05)
+cax.set_visible(False)
 i_subplot += 1
 
-if l2seq is not None:
+if l2seqs is not None:
     # event plot for the spike train
-    plt.subplot(num_subplots, 1, i_subplot)  # Bottom subplot for the spike train
-    plt.ylabel("Layer 2")
+    axs[i_subplot].set_ylabel("Layer 2")
     # Convert the spike train into an event list format
     neuron_indices, time_steps = np.where(l2seq.T == 1)  # Find where spikes occur
     events = [[] for _ in range(l2seq.shape[1])]  # Create a list for each neuron
-    for neuron, time in zip(neuron_indices, time_steps):
-        events[neuron].append(time)
-    plt.xlim(xlim)
-    plt.eventplot(events, orientation="horizontal", linelengths=0.8, colors="black")
-    plt.tight_layout()
+    for neuron, t in zip(neuron_indices, time_steps):
+        events[neuron].append(t)
+    axs[i_subplot].set_xlim(xlim)
+    axs[i_subplot].eventplot(events, orientation="horizontal", linelengths=0.8, colors="black")
+    divider = make_axes_locatable(axs[i_subplot])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cax.set_visible(False)
     i_subplot += 1
 
-# Create an event plot for the spike train
-plt.subplot(num_subplots, 1, i_subplot)  # Bottom subplot for the spike train
-plt.xlabel("Time Steps")
-plt.ylabel("Output")
-plt.imshow(outseq.T, aspect="auto", cmap="viridis", origin="lower", interpolation="nearest")
-plt.tight_layout()
+# output heatmap
+axs[i_subplot].set_xlabel("Time Steps")
+axs[i_subplot].set_ylabel("Output")
+im = axs[i_subplot].imshow(outseq.T, aspect="auto", cmap="viridis", origin="lower", interpolation="nearest")
+divider = make_axes_locatable(axs[i_subplot])
+cax = divider.append_axes('right', size='5%', pad=0.05)
+fig.colorbar(im, cax=cax, orientation='vertical')
 
-# Show the plots
-plt.savefig("spikeplot.png")
+# add target to filename
+strtarget = ""
+if cfg.dataset._target_ in ["datasets.smnist.SMNISTLDM", "datasets.csmnist.CSMNISTLDM"]:
+    target = int(targets[i_in_batch, 1])
+    strtarget = "_" + str(target)[:10]
+
+fig.tight_layout()
+fig.savefig(f"spikeplot_{date}_{time}{strtarget}.pdf")
