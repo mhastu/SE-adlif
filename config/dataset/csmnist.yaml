@@ -9,3 +9,4 @@ random_seed: 42
 window_size: 1000
 amplification: 1
 ignore_first_timesteps: 700
+input_size: 1  # implied in CSMNIST, i.e. not used for training. but used by spike_plot.py
