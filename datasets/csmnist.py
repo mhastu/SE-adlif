@@ -42,7 +42,6 @@ class CSMNISTLDM(pl.LightningDataModule):
     def __init__(
         self,
         data_path: str,
-        dt: float = 1000,  # duration (in us) for each timestep
         batch_size: int = 32,
         num_workers: int = 1,
         name: str = None,  # for hydra
@@ -50,11 +49,11 @@ class CSMNISTLDM(pl.LightningDataModule):
         valid_fraction: float = 0.05,
         random_seed = 42,
         amplification=1,
-        ignore_first_timesteps: int = 10
+        ignore_first_timesteps: int = 10,
+        input_size = 1  # ignored, 1 is implied. needed so restoring hparams still works in spike_plot.py
     ) -> None:
         super().__init__()
         self.data_path = data_path
-        self.dt = dt
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_fraction = valid_fraction
@@ -71,7 +70,6 @@ class CSMNISTLDM(pl.LightningDataModule):
         self.data_test = CSMNISTWrapper(
             save_to=self.data_path,
             train=False,
-            dt=self.dt,
             amplification=self.amplification,
             ignore_first_timesteps=self.ignore_first_timesteps
         )
@@ -79,7 +77,6 @@ class CSMNISTLDM(pl.LightningDataModule):
         self.train_val_ds = CSMNISTWrapper(
             save_to=self.data_path,
             train=True,
-            dt=self.dt,
             amplification=self.amplification,
             ignore_first_timesteps=self.ignore_first_timesteps
         )
