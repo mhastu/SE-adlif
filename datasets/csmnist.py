@@ -18,13 +18,13 @@ class CSMNISTWrapper(SMNIST):
         save_to,
         train=True,
         duplicate=True,
-        dt=1000.0,
         amplification=1,  # scale image data to this maximum current value
         ignore_first_timesteps: int = 700,
     ):
         # transforms are None: the wrapper already outputs the correct datatype for the model, so it
         # interprets it as input current (float)
-        super().__init__(save_to, train=train, duplicate=duplicate, num_neurons=1, dt=dt, transform=None, target_transform=None)
+        # dt is not used, since we completely overwrite __getitem__() to use an implicit dt of 1ms
+        super().__init__(save_to, train=train, duplicate=duplicate, num_neurons=1, transform=None, target_transform=None)
         self.amplification = amplification
         self.ignore_first_timesteps = ignore_first_timesteps
 
@@ -42,7 +42,6 @@ class CSMNISTLDM(pl.LightningDataModule):
     def __init__(
         self,
         data_path: str,
-        window_size: float = 1000.0,  # should also be in us, since dt is in us
         dt: float = 1000,  # duration (in us) for each timestep
         batch_size: int = 32,
         num_workers: int = 1,
@@ -55,7 +54,6 @@ class CSMNISTLDM(pl.LightningDataModule):
     ) -> None:
         super().__init__()
         self.data_path = data_path
-        self.window_size = window_size
         self.dt = dt
         self.batch_size = batch_size
         self.num_workers = num_workers
