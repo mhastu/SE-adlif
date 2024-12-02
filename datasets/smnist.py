@@ -18,7 +18,7 @@ class SMNISTWrapper(SMNIST):
         self,
         save_to,
         train=True,
-        duplicate=True,
+        duplicate=False,
         num_neurons=33,
         dt=1000.0,
         transform=None,
@@ -48,7 +48,8 @@ class SMNISTLDM(pl.LightningDataModule):
         num_classes: int = 10,  # for hydra
         valid_fraction: float = 0.05,
         random_seed = 42,
-        ignore_first_timesteps: int = 10
+        ignore_first_timesteps: int = 10,
+        duplicate: bool = False
     ) -> None:
         super().__init__()
         self.data_path = data_path
@@ -59,6 +60,7 @@ class SMNISTLDM(pl.LightningDataModule):
         self.valid_fraction = valid_fraction
         self.random_seed = random_seed
         self.ignore_first_timesteps = ignore_first_timesteps
+        self.duplicate = duplicate
 
         # TODO: try without PadTensors() (then a default collate_fn is used)
         self.collate_fn = PadTensors()
@@ -85,7 +87,8 @@ class SMNISTLDM(pl.LightningDataModule):
             num_neurons=self.input_size,
             dt=self.dt,
             transform=self.static_data_transform,
-            ignore_first_timesteps=self.ignore_first_timesteps
+            ignore_first_timesteps=self.ignore_first_timesteps,
+            duplicate=self.duplicate
         )
 
         self.train_val_ds = SMNISTWrapper(
@@ -94,7 +97,8 @@ class SMNISTLDM(pl.LightningDataModule):
             num_neurons=self.input_size,
             dt=self.dt,
             transform=self.static_data_transform,
-            ignore_first_timesteps=self.ignore_first_timesteps
+            ignore_first_timesteps=self.ignore_first_timesteps,
+            duplicate=self.duplicate
         )
         valid_len = math.floor(len(self.train_val_ds) * self.valid_fraction)
         self.data_train, self.data_val = torch.utils.data.random_split(
