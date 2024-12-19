@@ -1,18 +1,18 @@
 # @package _global_
 
 defaults:
-  - /dataset: csmnist
+  - /dataset: smnist
 
-exp_name: CSMNIST_SE_adLIF
+exp_name: SMNIST_SE_adLIF
 
 # Which cell to use
 cell: se_adlif
 
 # number of neurons
-n_neurons: 180
+n_neurons: 90
 
 # Whether to use a two-layer network
-two_layers: true
+two_layers: false
 
 # Factor for reparametrization of a and b (see paper)
 q: 60

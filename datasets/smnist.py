@@ -5,13 +5,39 @@ import math
 from typing import Optional
 from torch.utils.data import DataLoader
 from datasets.utils.pad_tensors import PadTensors
-from tonic.transforms import ToFrame, Compose
-from datasets.utils.transforms import Flatten
 import numpy as np
 
 
+def current_encode(image, sensor_length = 1):
+    return torch.from_numpy(image[:, None] / 255).float()  # the model wants input shape (time, x), where x is the flattened sensor size
+
+def spike_encode(image, sensor_length):
+    # Determine how many neurons should encode onset and offset
+    half_size = sensor_length // 2
+
+    # Determine thresholds of each neuron
+    thresholds = np.linspace(0.0, 254.0, half_size).astype(np.uint8)
+
+    # Determine for which pixels each neuron is above or below its threshol
+    lower = image[:, None] < thresholds[None, :]
+    higher = image[:, None] >= thresholds[None, :]
+
+    # Get onsets and offset (transitions between lower and higher) spike times and ids
+    on_spike_frame = np.logical_and(lower[:-1], higher[1:])
+    off_spike_frame = np.logical_and(higher[:-1], lower[1:])
+
+    # Get times when image is 255 and create matching neuron if
+    touch_spike_frame = (image == 255)[1:, None]
+
+    frames = np.concatenate((on_spike_frame, off_spike_frame, touch_spike_frame), axis=1)
+    frames = torch.from_numpy(frames).float()
+    return frames
+
+
+# inherit from SMNIST for image downloading etc. but rewrite __getitem__ for current-encdoing with fixed number of frames (783 or 784)
+# because SMNIST from tonic only outputs events and ToFrame would then cut off leading or trailing idleness which also contains information
 class SMNISTWrapper(SMNIST):
-    """Wrapper to support block_idx"""
+    """Spiking/current-encoded sequential MNIST with fixed number of frames. Wrapper to support block_idx"""
     dataset_name = "SMNIST"
 
     def __init__(
@@ -20,64 +46,58 @@ class SMNISTWrapper(SMNIST):
         train=True,
         duplicate=False,
         num_neurons=33,
-        dt=1000.0,
-        transform=None,
-        target_transform=None,
-        ignore_first_timesteps: int = 20,
+        ignore_first_timesteps: int = 700,
+        amplification=1,  # scale input current to this maximum current value
     ):
-        super().__init__(save_to, train=train, duplicate=duplicate, num_neurons=num_neurons, dt=dt, transform=transform, target_transform=target_transform)
+        # transforms are None: the wrapper already outputs the correct datatype for the model, so it
+        # interprets it as input current (float)
+        # dt is not used, since we completely overwrite __getitem__() to use an implicit dt of 1ms
+        super().__init__(save_to, train=train, duplicate=duplicate, num_neurons=num_neurons, transform=None, target_transform=None)
+        self.amplification = amplification
         self.ignore_first_timesteps = ignore_first_timesteps
 
+        self.encode = spike_encode
+        if num_neurons == 1:
+            self.encode = current_encode
+
     def __getitem__(self, index):
-        events, target = super().__getitem__(index)
+        frames = self.encode(self.image_data[index], self.sensor_size[0])
+        frames = frames * self.amplification
+        target = self.label_data[index]
+
         target = target.astype(np.int64)  # fix in pad_sequence "RuntimeError: value cannot be converted to type uint8_t without overflow"
-        block_idx = torch.ones((events.shape[0],), dtype=torch.int64)
+        block_idx = torch.ones((frames.shape[0],), dtype=torch.int64)
         block_idx[:self.ignore_first_timesteps] = 0
-        return events, target, block_idx
+        return frames, target, block_idx
 
 class SMNISTLDM(pl.LightningDataModule):
     def __init__(
         self,
         data_path: str,
-        window_size: float = 1000.0,  # should also be in us, since dt is in us
         input_size: int = 33,  # number of input neurons, must be odd
-        dt: float = 1000,  # duration (in us) for each timestep
         batch_size: int = 32,
         num_workers: int = 1,
         name: str = None,  # for hydra
         num_classes: int = 10,  # for hydra
         valid_fraction: float = 0.05,
         random_seed = 42,
+        amplification=1,
         ignore_first_timesteps: int = 10,
-        duplicate: bool = False
     ) -> None:
         super().__init__()
         self.data_path = data_path
-        self.window_size = window_size
-        self.dt = dt
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_fraction = valid_fraction
         self.random_seed = random_seed
+        self.amplification = amplification
         self.ignore_first_timesteps = ignore_first_timesteps
-        self.duplicate = duplicate
 
         # TODO: try without PadTensors() (then a default collate_fn is used)
         self.collate_fn = PadTensors()
         self.output_size = num_classes
 
         self.input_size = input_size
-        sensor_size = (input_size, 1, 1)
-        _event_to_tensor = ToFrame(
-            sensor_size=sensor_size, time_window=self.window_size
-        )
-        def event_to_tensor(x):
-            return torch.from_numpy(_event_to_tensor(x)).float()
-
-        self.static_data_transform = Compose([
-            event_to_tensor,
-            Flatten()
-        ])
 
         self.generator = torch.Generator().manual_seed(self.random_seed)
 
@@ -85,20 +105,16 @@ class SMNISTLDM(pl.LightningDataModule):
             save_to=self.data_path,
             train=False,
             num_neurons=self.input_size,
-            dt=self.dt,
-            transform=self.static_data_transform,
-            ignore_first_timesteps=self.ignore_first_timesteps,
-            duplicate=self.duplicate
+            amplification=self.amplification,
+            ignore_first_timesteps=self.ignore_first_timesteps
         )
 
         self.train_val_ds = SMNISTWrapper(
             save_to=self.data_path,
             train=True,
             num_neurons=self.input_size,
-            dt=self.dt,
-            transform=self.static_data_transform,
-            ignore_first_timesteps=self.ignore_first_timesteps,
-            duplicate=self.duplicate
+            amplification=self.amplification,
+            ignore_first_timesteps=self.ignore_first_timesteps
         )
         valid_len = math.floor(len(self.train_val_ds) * self.valid_fraction)
         self.data_train, self.data_val = torch.utils.data.random_split(
