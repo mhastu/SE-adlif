@@ -56,6 +56,14 @@ class MLPSNN(pl.LightningModule):
         self.init_metrics_and_loss()
         self.save_hyperparameters()
 
+        # make gradient-tracking configurable
+        def log_gradnorm(optimizer) -> None:
+            gradient_norm = grad_norm(self, norm_type=2)['grad_2.0_norm_total']
+            self.log("gradient_norm", gradient_norm, prog_bar=True, on_step=True, on_epoch=False)
+
+        if cfg.get('log_gradient', False):
+            self.on_before_optimizer_step = log_gradnorm
+
     # @torch.compile
     def forward(
         self, inputs: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
