@@ -1,7 +1,7 @@
 # @package _global_
 
 defaults:
-  - /dataset: smnist
+  - /dataset: smnistc
 
 exp_name: SMNIST_SE_adLIF
 
