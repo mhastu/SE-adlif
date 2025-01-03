@@ -164,7 +164,7 @@ fig.colorbar(im, cax=cax, orientation='horizontal' if input.shape[1] == 1 else '
 i_subplot += 1
 
 # event plot for the spike train
-axs[i_subplot].set_ylabel("Layer 1")
+axs[i_subplot].set_ylabel(f"Layer 1 ({l1seqs[i_in_batch].mean()*100:.2f}%)")
 axs[i_subplot].set_xlim(xlim)
 axs[i_subplot].imshow(l1seq.T, aspect="auto", cmap="Greys", origin="lower", interpolation="nearest")
 divider = make_axes_locatable(axs[i_subplot])
@@ -174,7 +174,7 @@ i_subplot += 1
 
 if l2seqs is not None:
     # event plot for the spike train
-    axs[i_subplot].set_ylabel("Layer 2")
+    axs[i_subplot].set_ylabel(f"Layer 2 ({l2seqs[i_in_batch].mean()*100:.2f}%)")
     axs[i_subplot].set_xlim(xlim)
     axs[i_subplot].imshow(l2seq.T, aspect="auto", cmap="Greys", origin="lower", interpolation="nearest")
     divider = make_axes_locatable(axs[i_subplot])
