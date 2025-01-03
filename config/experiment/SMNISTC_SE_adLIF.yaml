@@ -3,7 +3,7 @@
 defaults:
   - /dataset: smnistc
 
-exp_name: SMNIST_SE_adLIF
+exp_name: SMNISTC_SE_adLIF
 
 # Which cell to use
 cell: se_adlif
@@ -12,7 +12,7 @@ cell: se_adlif
 n_neurons: 90
 
 # Whether to use a two-layer network
-two_layers: false
+two_layers: true
 
 # Factor for reparametrization of a and b (see paper)
 q: 60
