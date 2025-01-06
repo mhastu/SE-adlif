@@ -2,9 +2,13 @@ from typing import Any, Callable, Dict, IO, Iterable, List, Optional, Tuple, Typ
 import torch
 import pytorch_lightning as pl
 from torchvision.datasets.cifar import CIFAR10
+import math
+from datasets.utils.pad_tensors import PadTensors
+from torch.utils.data import DataLoader
+import numpy as np
 
 
-class SCIFAR10(CIFAR10):
+class CIFAR10Wrapper(CIFAR10):
     """Sequential `CIFAR-10 <https://www.cs.toronto.edu/~kriz/cifar.html>`
     
     The CIFAR-10 dataset consists of 60000 32x32 colour images in 10 classes, with 6000 images per class. There are 50000 training images and 10000 test images.
@@ -31,7 +35,7 @@ class SCIFAR10(CIFAR10):
         self,
         save_to,
         train=True,
-        ignore_first_timesteps: int = 700,
+        ignore_first_timesteps: int = 900,
         amplification=1,  # scale input current to this maximum current value
     ):
         super().__init__(root=save_to, train=train, transform=None, target_transform=None, download=True)
@@ -39,11 +43,24 @@ class SCIFAR10(CIFAR10):
         self.data = self.data.transpose((0, 3, 1, 2))
         self.data = self.data.reshape(-1, 3072)
 
-class SMNISTLDM(pl.LightningDataModule):
+        self.ignore_first_timesteps = ignore_first_timesteps
+        self.amplification = amplification
+
+    def __getitem__(self, index):
+        image = self.data[index]
+        image = torch.from_numpy(image[:, None] / 255).float()  # the model wants input shape (time, x), where x is the flattened sensor size
+        image = image * self.amplification
+        target = self.targets[index]
+
+        target = np.int64(target)  # target must be numpy int
+        block_idx = torch.ones((image.shape[0],), dtype=torch.int64)
+        block_idx[:self.ignore_first_timesteps] = 0
+        return image, target, block_idx
+
+class CIFAR10LDM(pl.LightningDataModule):
     def __init__(
         self,
         data_path: str,
-        input_size: int = 33,  # number of input neurons, must be odd
         batch_size: int = 32,
         num_workers: int = 1,
         name: str = None,  # for hydra
@@ -51,7 +68,7 @@ class SMNISTLDM(pl.LightningDataModule):
         valid_fraction: float = 0.05,
         random_seed = 42,
         amplification=1,
-        ignore_first_timesteps: int = 10,
+        ignore_first_timesteps: int = 900,
     ) -> None:
         super().__init__()
         self.data_path = data_path
@@ -66,22 +83,18 @@ class SMNISTLDM(pl.LightningDataModule):
         self.collate_fn = PadTensors()
         self.output_size = num_classes
 
-        self.input_size = input_size
-
         self.generator = torch.Generator().manual_seed(self.random_seed)
 
-        self.data_test = SMNISTWrapper(
+        self.data_test = CIFAR10Wrapper(
             save_to=self.data_path,
             train=False,
-            num_neurons=self.input_size,
             amplification=self.amplification,
             ignore_first_timesteps=self.ignore_first_timesteps
         )
 
-        self.train_val_ds = SMNISTWrapper(
+        self.train_val_ds = CIFAR10Wrapper(
             save_to=self.data_path,
             train=True,
-            num_neurons=self.input_size,
             amplification=self.amplification,
             ignore_first_timesteps=self.ignore_first_timesteps
         )
