@@ -35,21 +35,18 @@ class CIFAR10Wrapper(CIFAR10):
         self,
         save_to,
         train=True,
-        ignore_first_timesteps: int = 900,
+        ignore_first_timesteps: int = 700,
         amplification=1,  # scale input current to this maximum current value
     ):
         super().__init__(root=save_to, train=train, transform=None, target_transform=None, download=True)
-        # we want the data flattened, so undo the reshaping operations from the parent class
-        self.data = self.data.transpose((0, 3, 1, 2))
-        self.data = self.data.reshape(-1, 3072)
+        # flatten the images to (height*width, channels)
+        self.data = self.data.reshape(self.data.shape[0], 1024, 3)
 
         self.ignore_first_timesteps = ignore_first_timesteps
         self.amplification = amplification
 
     def __getitem__(self, index):
-        image = self.data[index]
-        image = torch.from_numpy(image[:, None] / 255).float()  # the model wants input shape (time, x), where x is the flattened sensor size
-        image = image * self.amplification
+        image = torch.from_numpy(self.data[index] / 255 * self.amplification).float()
         target = self.targets[index]
 
         target = np.int64(target)  # target must be numpy int
@@ -68,7 +65,8 @@ class CIFAR10LDM(pl.LightningDataModule):
         valid_fraction: float = 0.05,
         random_seed = 42,
         amplification=1,
-        ignore_first_timesteps: int = 900,
+        ignore_first_timesteps: int = 700,
+        input_size = 3  # for spike_plot.py
     ) -> None:
         super().__init__()
         self.data_path = data_path
