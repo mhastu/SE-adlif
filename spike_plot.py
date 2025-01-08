@@ -12,9 +12,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 parser = argparse.ArgumentParser(description="Plot spiking events or current values of all layers (input, 1, 2, output) when passing one sample through the model, given a checkpoint file. Model configuration is taken from parent directory of checkpoint path (hparams.yaml)")
 
 parser.add_argument(
-    "-f", "--ckpt-filepath", 
+    "ckpt_filepath",
     type=str,
-    required=True,
     help="Path to the checkpoint file."
 )
 parser.add_argument(
