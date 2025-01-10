@@ -191,9 +191,8 @@ fig.colorbar(im, cax=cax, orientation='vertical')
 
 # add target to filename
 strtarget = ""
-if cfg.dataset._target_ in ["datasets.smnist.SMNISTLDM", "datasets.csmnist.CSMNISTLDM"]:
-    target = int(targets[i_in_batch, 1])
-    strtarget = "_" + str(target)[:10]
+target = int(targets[i_in_batch, 1])
+strtarget = "_" + str(target)[:10]
 
 fig.tight_layout()
 fig.savefig(f"spikeplot_{date}_{time}{strtarget}.pdf")
