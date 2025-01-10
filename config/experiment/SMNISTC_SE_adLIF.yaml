@@ -9,20 +9,20 @@ exp_name: SMNISTC_SE_adLIF
 cell: se_adlif
 
 # number of neurons
-n_neurons: 90
+n_neurons: 180
 
 # Whether to use a two-layer network
 two_layers: true
 
 # Factor for reparametrization of a and b (see paper)
-q: 60
+q: 120
 
 # Parameters of SLAYER
 alpha: 5
 c: 0.2
 
 # Number of epochs
-n_epochs: 20
+n_epochs: 120
 
 # Range of tau_u
 tau_u_range: [5, 25]
@@ -45,7 +45,7 @@ tracking_mode: max
 
 # optimizer parameters
 # learning rate of the optimizer
-lr: 0.006
+lr: 0.01
 factor: 0.9
 patience: 9999
 

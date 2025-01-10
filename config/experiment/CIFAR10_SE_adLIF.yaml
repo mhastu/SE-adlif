@@ -22,7 +22,7 @@ alpha: 5
 c: 0.2
 
 # Number of epochs
-n_epochs: 20
+n_epochs: 80
 
 # Range of tau_u
 tau_u_range: [5, 25]
@@ -47,7 +47,7 @@ tracking_mode: max
 # learning rate of the optimizer
 lr: 0.01
 factor: 0.9
-patience: 9999
+patience: 15
 
-# number of input neurons is one for current-encoding
-input_size: 1
+# number of input neurons (channels)
+input_size: 3
