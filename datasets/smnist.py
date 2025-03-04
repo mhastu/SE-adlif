@@ -54,6 +54,8 @@ class SMNISTWrapper(SMNIST):
         # dt is not used, since we completely overwrite __getitem__() to use an implicit dt of 1ms
         super().__init__(save_to, train=train, duplicate=duplicate, num_neurons=num_neurons, transform=None, target_transform=None)
         self.amplification = amplification
+        if duplicate:
+            self.amplification = self.amplification * 2  # compatibility with older runs where the duplicate flag was set
         self.ignore_first_timesteps = ignore_first_timesteps
 
         self.encode = spike_encode
@@ -83,6 +85,7 @@ class SMNISTLDM(pl.LightningDataModule):
         random_seed = 42,
         amplification=1,
         ignore_first_timesteps: int = 10,
+        duplicate: bool = False
     ) -> None:
         super().__init__()
         self.data_path = data_path
@@ -106,7 +109,8 @@ class SMNISTLDM(pl.LightningDataModule):
             train=False,
             num_neurons=self.input_size,
             amplification=self.amplification,
-            ignore_first_timesteps=self.ignore_first_timesteps
+            ignore_first_timesteps=self.ignore_first_timesteps,
+            duplicate=duplicate
         )
 
         self.train_val_ds = SMNISTWrapper(
@@ -114,7 +118,8 @@ class SMNISTLDM(pl.LightningDataModule):
             train=True,
             num_neurons=self.input_size,
             amplification=self.amplification,
-            ignore_first_timesteps=self.ignore_first_timesteps
+            ignore_first_timesteps=self.ignore_first_timesteps,
+            duplicate=duplicate
         )
         valid_len = math.floor(len(self.train_val_ds) * self.valid_fraction)
         self.data_train, self.data_val = torch.utils.data.random_split(
